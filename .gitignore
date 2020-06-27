@@ -1,0 +1,10 @@
+resources/
+results/
+
+.cache/
+.bashrc
+.bash_logout
+.bash_history
+
+.ipynb_checkpoints/
+.profile
