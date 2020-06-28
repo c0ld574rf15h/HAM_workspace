@@ -1,4 +1,3 @@
-import colored_glog as log
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -62,9 +61,7 @@ class HierarchicalAttentionModel(nn.Module):
         )
 
     def forward(self, flow):
-        log.warn('Running Forward...')
         num_packets, batch_sz = flow.shape[0], flow.shape[1]
-        log.warn('Making empty packet embeddings')
         packet_embeddings = torch.zeros(
             num_packets,
             batch_sz,
@@ -72,9 +69,23 @@ class HierarchicalAttentionModel(nn.Module):
         ).to('cuda')
 
         # Byte Level
-        log.warn('Running byte embeddings')
         byte_embeddings = self.byte_embedding(flow)
-        print('Byte Embeddings Shape: {}'.format(byte_embeddings))
 
-        return None
+        for idx, byte_embedding in enumerate(byte_embeddings):
+            init_h = torch.zeros((2, batch_sz, eval(self.conf['ByteGRUHiddenDim']))).to('cuda')
+            output, _ = self.byte_biGRU(byte_embedding.transpose(0, 1), init_h)
 
+            attention_scores = self.byte_attention(output)
+            packet_embeddings[idx, :, :] = (output * attention_scores).sum(dim=0)
+
+        # Packet Level
+        init_h = torch.zeros((2, batch_sz, eval(self.conf['PacketGRUHiddenDim']))).to('cuda')
+        output, _ = self.packet_biGRU(packet_embeddings, init_h)
+
+        attention_scores = self.packet_attention(output)
+        flow_embedding = (output * attention_scores).sum(dim=1)
+
+        # Final Classification
+        preds = self.final_classification(flow_embedding)
+
+        return preds

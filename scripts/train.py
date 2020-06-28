@@ -19,9 +19,6 @@ def fetch_dataset():
     X = np.load(wrap_path(config['TrainDataPath']))
     y = np.load(wrap_path(config['TrainLabelPath']))
 
-    X = torch.Tensor(X).type(torch.int8).to('cuda')
-    y = torch.Tensor(y).type(torch.int8).to('cuda')
-
     return X, y
 
 
@@ -41,9 +38,9 @@ if __name__ == '__main__':
         log.info(f'Running Epoch #{epoch+1}')
         total_train_loss, total_valid_loss = 0, 0
 
-        for fold, (train_idx, valid_idx) in enumerate(kfold.split(X.cpu().numpy(), y.cpu().numpy())):
-            train_dataset = TensorDataset(X[train_idx], y[train_idx])
-            valid_dataset = TensorDataset(X[valid_idx], y[valid_idx])
+        for fold, (train_idx, valid_idx) in enumerate(kfold.split(X, y)):
+            train_dataset = TensorDataset(torch.Tensor(X[train_idx]), torch.Tensor(y[train_idx]))
+            valid_dataset = TensorDataset(torch.Tensor(X[valid_idx]), torch.Tensor(y[valid_idx]))
 
             train_dataloader = DataLoader(train_dataset, batch_size=eval(config['BatchSize']))
             valid_dataloader = DataLoader(valid_dataset, batch_size=eval(config['BatchSize']))
@@ -58,8 +55,8 @@ if __name__ == '__main__':
                     pbar.update(1)
                     optimizer.zero_grad()
 
-                    preds = model(train_X.type(torch.long))
-                    loss = criterion(preds, train_y)
+                    preds = model(train_X.type(torch.long).to('cuda'))
+                    loss = criterion(preds, train_y.type(torch.long).to('cuda'))
                     train_loss += loss
 
                     loss.backward()
@@ -73,17 +70,17 @@ if __name__ == '__main__':
                     for batch_id, (valid_X, valid_y) in enumerate(valid_dataloader):
                         pbar.update(1)
 
-                        preds = model(valid_X)
-                        loss = criterion(preds, valid_y)
+                        preds = model(valid_X.type(torch.long).to('cuda'))
+                        loss = criterion(preds, valid_y.type(torch.long).to('cuda'))
                         valid_loss += loss
 
             total_valid_loss += valid_loss
 
-            log_msg = 'Avg. Loss on Fold #{} ==> Train : {:.4f}\tValidation : {:.4f}'
-            log.info(log_msg.format(fold, total_train_loss/num_split, total_valid_loss/num_split))
+        log_msg = 'Avg Loss ==> Train : {:.4f}\tValidation : {:.4f}'
+        log.info(log_msg.format(total_train_loss/num_split, total_valid_loss/num_split))
 
         history.append((total_train_loss/num_split, total_valid_loss/num_split))
-        torch.save(model.state_dict(), wrap_path(config['ModelSavePath'].format(epoch=epoch)))
+        torch.save(model.state_dict(), wrap_path(config['ModelSavePath'].format(epoch=epoch+1)))
 
     with open(wrap_path(config['HistorySavePath']), 'wb') as f:
         pickle.dump(history, f)
