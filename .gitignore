@@ -3,6 +3,7 @@ results/
 
 modules/__pycache__/
 scripts/__pycache__/
+scripts/nohup.out
 
 .cache/
 .bashrc
