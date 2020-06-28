@@ -38,6 +38,27 @@ if __name__ == '__main__':
         log.info(f'Running Epoch #{epoch+1}')
         total_train_loss, total_valid_loss = 0, 0
 
+        train_dataset = TensorDataset(torch.Tensor(X), torch.Tensor(y))
+        train_dataloader = DataLoader(train_dataset, batch_size=eval(config['BatchSize']))
+
+        train_loss = 0
+        num_train_iteration = len(train_dataset) // eval(config['BatchSize'])
+
+        with tqdm(total=num_train_iteration) as pbar:
+            for batch_id, (train_X, train_y) in enumerate(train_dataloader):
+                pbar.update(1)
+                optimizer.zero_grad()
+
+                preds = model(train_X.type(torch.long).to('cuda'))
+                loss = criterion(preds, train_y.type(torch.long).to('cuda'))
+                train_loss += loss
+
+                loss.backward()
+                optimizer.step()
+
+        total_train_loss += loss
+
+        '''
         for fold, (train_idx, valid_idx) in enumerate(kfold.split(X, y)):
             train_dataset = TensorDataset(torch.Tensor(X[train_idx]), torch.Tensor(y[train_idx]))
             valid_dataset = TensorDataset(torch.Tensor(X[valid_idx]), torch.Tensor(y[valid_idx]))
@@ -81,6 +102,11 @@ if __name__ == '__main__':
 
         history.append((total_train_loss/num_split, total_valid_loss/num_split))
         torch.save(model.state_dict(), wrap_path(config['ModelSavePath'].format(epoch=epoch+1)))
+        '''
+        log.info('Train Loss : {:.4f}'.format(total_train_loss))
+        torch.save(model.state_dict(), wrap_path(config['ModelSavePath'].format(epoch=epoch+1)))
 
+    '''
     with open(wrap_path(config['HistorySavePath']), 'wb') as f:
         pickle.dump(history, f)
+    '''
